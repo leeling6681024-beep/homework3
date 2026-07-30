@@ -1,0 +1,1049 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>2026-2027 晨讀專注評分系統</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <!-- FontAwesome Icons CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <!-- Vue 3 CDN -->
+    <script src="https://unpkg.com/vue@3/dist/vue.global.js"></script>
+    <!-- Google Fonts Inter & Noto Sans TC -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <style>
+        body {
+            font-family: 'Noto Sans TC', 'Inter', sans-serif;
+            background-color: #f8fafc;
+        }
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: #f1f5f9;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: #cbd5e1;
+            border-radius: 4px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: #94a3b8;
+        }
+    </style>
+</head>
+<body class="text-slate-800 antialiased min-h-screen">
+
+    <div id="app" class="flex flex-col min-h-screen">
+        <!-- Header Nav -->
+        <header class="bg-indigo-900 text-white shadow-lg sticky top-0 z-50">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-3.5 flex flex-wrap justify-between items-center gap-4">
+                <div class="flex items-center space-x-3">
+                    <div class="bg-indigo-700 p-2.5 rounded-xl shadow-inner">
+                        <i class="fa-solid fa-book-open-reader text-2xl text-amber-300"></i>
+                    </div>
+                    <div>
+                        <h1 class="text-xl sm:text-2xl font-bold tracking-tight">2026-2027 晨讀專注評分系統</h1>
+                        <p class="text-xs text-indigo-200">全校中學部晨讀專注度巡視與數據記錄</p>
+                    </div>
+                </div>
+
+                <!-- Global Role & Date Controls -->
+                <div class="flex flex-wrap items-center gap-3">
+                    <!-- Date Picker -->
+                    <div class="flex items-center bg-indigo-800/80 rounded-lg px-3 py-1.5 border border-indigo-700">
+                        <i class="fa-regular fa-calendar-check text-amber-300 mr-2"></i>
+                        <span class="text-xs text-indigo-200 mr-1 hidden sm:inline">巡視日期：</span>
+                        <input type="date" v-model="selectedDate" @change="handleDateChange"
+                            class="bg-transparent text-sm text-white font-medium focus:outline-none cursor-pointer">
+                    </div>
+
+                    <!-- Role Selector in Header -->
+                    <div class="flex items-center bg-amber-500/10 border border-amber-400/30 rounded-lg px-3 py-1.5">
+                        <i class="fa-solid fa-user-check text-amber-400 mr-2"></i>
+                        <span class="text-xs text-amber-200 mr-2 font-medium">當前身份：</span>
+                        <select v-model="currentRole" @change="handleRoleChange"
+                            class="bg-indigo-950 text-amber-300 font-bold text-sm rounded px-2 py-0.5 border border-amber-500/40 focus:outline-none cursor-pointer">
+                            <option v-for="role in roles" :key="role" :value="role">{{ role }}</option>
+                        </select>
+                    </div>
+
+                    <!-- Backup & Restore Data Buttons for Google Sites Support -->
+                    <div class="flex items-center space-x-1 pl-2 border-l border-indigo-700/60">
+                        <button @click="showCloudModal = true" title="設定 Google 試算表雲端同步"
+                            :class="['text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 border',
+                                cloudUrl ? 'bg-amber-500 hover:bg-amber-600 text-indigo-950 font-bold border-amber-400' : 'bg-indigo-800 hover:bg-indigo-700 text-indigo-100 border-indigo-600']">
+                            <i class="fa-solid fa-cloud-arrow-up text-amber-300"></i>
+                            <span class="hidden sm:inline">{{ cloudUrl ? '雲端同步中' : '設定雲端同步' }}</span>
+                        </button>
+                        <button @click="exportBackupJSON" title="匯出 JSON 備份檔"
+                            class="bg-indigo-800 hover:bg-indigo-700 text-indigo-100 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 border border-indigo-600">
+                            <i class="fa-solid fa-download text-amber-300"></i>
+                            <span class="hidden md:inline">備份資料</span>
+                        </button>
+                        <label title="匯入 JSON 備份檔"
+                            class="bg-indigo-800 hover:bg-indigo-700 text-indigo-100 text-xs px-2.5 py-1.5 rounded-lg font-medium transition-colors flex items-center gap-1 border border-indigo-600 cursor-pointer">
+                            <i class="fa-solid fa-upload text-emerald-300"></i>
+                            <span class="hidden md:inline">匯入資料</span>
+                            <input type="file" accept=".json" @change="importBackupJSON" class="hidden">
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab Navigation -->
+            <div class="bg-indigo-950/60 border-t border-indigo-800/50">
+                <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 sm:space-x-4 overflow-x-auto">
+                    <button @click="activeTab = 'rating'"
+                        :class="['px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap',
+                            activeTab === 'rating' ? 'border-amber-400 text-amber-300 bg-indigo-900/50' : 'border-transparent text-indigo-200 hover:text-white']">
+                        <i class="fa-solid fa-pen-to-square"></i>
+                        即時打分卡
+                    </button>
+                    <!-- 只限「老師」身份可見總分與總覽頁籤 -->
+                    <button v-if="currentRole === '老師'" @click="activeTab = 'cumulative'"
+                        :class="['px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap',
+                            activeTab === 'cumulative' ? 'border-amber-400 text-amber-300 bg-indigo-900/50' : 'border-transparent text-indigo-200 hover:text-white']">
+                        <i class="fa-solid fa-trophy"></i>
+                        各級比賽累計總分
+                    </button>
+                    <button v-if="currentRole === '老師'" @click="activeTab = 'overview'"
+                        :class="['px-4 py-3 text-sm font-semibold border-b-2 transition-colors flex items-center gap-2 whitespace-nowrap',
+                            activeTab === 'overview' ? 'border-amber-400 text-amber-300 bg-indigo-900/50' : 'border-transparent text-indigo-200 hover:text-white']">
+                        <i class="fa-solid fa-table-list"></i>
+                        評分總覽表
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Toast Notification -->
+        <div v-if="toastMessage" 
+            class="fixed bottom-5 right-5 z-50 bg-emerald-700 text-white px-4 py-3 rounded-xl shadow-2xl flex items-center space-x-3 transition-all duration-300 animate-bounce">
+            <i class="fa-solid fa-circle-check text-xl text-emerald-200"></i>
+            <span class="text-sm font-medium">{{ toastMessage }}</span>
+        </div>
+
+        <!-- Cloud Sync Modal -->
+        <div v-if="showCloudModal" class="fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+            <div class="bg-white rounded-2xl max-w-lg w-full p-6 shadow-2xl border border-slate-100 space-y-4">
+                <div class="flex justify-between items-center border-b pb-3">
+                    <h3 class="text-base font-bold text-slate-800 flex items-center gap-2">
+                        <i class="fa-solid fa-cloud text-indigo-600"></i> Google 試算表 (Cloud Sync) 跨裝置同步設定
+                    </h3>
+                    <button @click="showCloudModal = false" class="text-slate-400 hover:text-slate-600"><i class="fa-solid fa-xmark text-lg"></i></button>
+                </div>
+                <div class="space-y-3 text-xs text-slate-600">
+                    <p>貼上您部署好的 Google Apps Script Web App API 網址，即可實現跨裝置即時打分與讀取：</p>
+                    <div>
+                        <label class="font-bold text-slate-700 block mb-1">Web App API 網址：</label>
+                        <input type="text" v-model="cloudUrlInput" placeholder="https://script.google.com/macros/s/.../exec"
+                            class="w-full border border-slate-300 rounded-lg p-2 text-xs focus:ring-2 focus:ring-indigo-500 focus:outline-none">
+                    </div>
+                    <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl text-[11px] text-amber-900 space-y-1">
+                        <p class="font-bold text-amber-800"><i class="fa-solid fa-triangle-exclamation mr-1"></i>部署權限檢查清單（極重要）：</p>
+                        <p>1. 「誰有存取權限」必須設定為「<strong>所有人 (Anyone)</strong>」，否則會讀取失敗。</p>
+                        <p>2. 網址結尾必須是 <code class="bg-amber-100 px-1 rounded">/exec</code>（請勿使用包含 <code class="bg-amber-100 px-1 rounded">/edit</code> 的網址）。</p>
+                    </div>
+                </div>
+                <div class="flex justify-end gap-2 pt-2 border-t">
+                    <button @click="showCloudModal = false" class="px-3 py-1.5 rounded-lg text-xs bg-slate-100 text-slate-600 font-medium hover:bg-slate-200">取消</button>
+                    <button @click="saveCloudConfig" class="px-4 py-1.5 rounded-lg text-xs bg-indigo-600 text-white font-bold hover:bg-indigo-700">儲存並測試同步</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Google Sites Storage Notice -->
+        <div v-if="isStorageRestricted" class="bg-amber-500/10 border-b border-amber-500/20 px-4 py-2 text-center text-xs text-amber-800 flex items-center justify-center gap-2">
+            <i class="fa-solid fa-triangle-exclamation text-amber-600"></i>
+            <span>提示：跨裝置（校長在 A 輸入、老師在 B 檢視）請點擊右上角「<strong>設定雲端同步</strong>」或善用「<strong>備份/匯入資料</strong>」。</span>
+        </div>
+
+        <!-- Main Content Area -->
+        <main class="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 lg:px-8 py-6">
+
+            <!-- TAB 1: RATING SECTION -->
+            <div v-if="activeTab === 'rating'" class="space-y-6">
+
+                <!-- Role Selector Quick Switch Bar -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div class="flex items-center space-x-3">
+                        <span class="text-sm font-bold text-slate-700 flex items-center">
+                            <i class="fa-solid fa-id-card text-indigo-600 mr-2 text-base"></i>切換評判身份：
+                        </span>
+                        <div class="flex flex-wrap gap-2">
+                            <button v-for="role in roles" :key="role"
+                                @click="currentRole = role"
+                                :class="['px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5',
+                                    currentRole === role 
+                                        ? 'bg-indigo-600 text-white shadow-md shadow-indigo-200 ring-2 ring-indigo-600 ring-offset-1' 
+                                        : 'bg-slate-100 text-slate-600 hover:bg-slate-200']">
+                                <i :class="getRoleIcon(role)"></i>
+                                {{ role }}
+                            </button>
+                        </div>
+                    </div>
+
+                    <!-- Progress Badge -->
+                    <div class="flex items-center space-x-2 bg-indigo-50 border border-indigo-100 rounded-xl px-3 py-1.5 text-xs">
+                        <span class="text-slate-600 font-medium">【{{ currentRole }}】完成進度：</span>
+                        <span class="font-black text-indigo-700 text-sm">{{ ratedCountByCurrentRole }} / {{ totalClassesCount }} 班</span>
+                    </div>
+                </div>
+
+                <!-- Filters Bar -->
+                <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200/80 flex flex-wrap items-center justify-between gap-4">
+                    <!-- Grade Filter Buttons -->
+                    <div class="flex flex-wrap items-center gap-1.5">
+                        <span class="text-xs font-bold text-slate-500 mr-1">年級：</span>
+                        <button @click="selectedGrade = 'ALL'"
+                            :class="['px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors',
+                                selectedGrade === 'ALL' ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200']">
+                            全部
+                        </button>
+                        <button v-for="g in grades" :key="g" @click="selectedGrade = g"
+                            :class="['px-2.5 py-1 rounded-lg text-xs font-semibold transition-colors',
+                                selectedGrade === g ? 'bg-slate-800 text-white' : 'bg-slate-100 text-slate-600 hover:bg-slate-200']">
+                            {{ g }}
+                        </button>
+                    </div>
+
+                    <!-- Status Filter & Search -->
+                    <div class="flex items-center gap-3 w-full sm:w-auto">
+                        <select v-model="statusFilter" class="bg-slate-50 border border-slate-300 text-xs font-medium rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            <option value="ALL">全部狀態</option>
+                            <option value="PENDING">待打分</option>
+                            <option value="COMPLETED">已打分</option>
+                        </select>
+
+                        <div class="relative flex-1 sm:w-48">
+                            <i class="fa-solid fa-magnifying-glass absolute left-3 top-2.5 text-slate-400 text-xs"></i>
+                            <input type="text" v-model="searchQuery" placeholder="搜尋班別 (如 1A)"
+                                class="w-full bg-slate-50 border border-slate-300 rounded-lg pl-8 pr-3 py-1.5 text-xs focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Classes Grid -->
+                <div v-if="filteredClasses.length > 0" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
+                    <div v-for="cls in filteredClasses" :key="cls.name"
+                        :class="['bg-white rounded-2xl p-5 border transition-all duration-200 shadow-sm hover:shadow-md relative flex flex-col justify-between',
+                            getScoreForClassRole(cls.name, currentRole) !== null ? 'border-indigo-300 ring-1 ring-indigo-200' : 'border-slate-200']">
+                        
+                        <div>
+                            <!-- Header Info -->
+                            <div class="flex justify-between items-center mb-4">
+                                <div class="flex items-center space-x-2">
+                                    <span class="text-2xl font-black text-indigo-950 tracking-tight">{{ cls.name }}</span>
+                                    <span class="text-xs font-medium text-slate-500 bg-slate-100 px-2 py-0.5 rounded-md">{{ cls.grade }}</span>
+                                </div>
+                                
+                                <div class="text-right">
+                                    <span v-if="getScoreForClassRole(cls.name, currentRole) !== null" 
+                                        class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-indigo-100 text-indigo-800 border border-indigo-200">
+                                        <i class="fa-solid fa-star text-amber-500 mr-1 text-[10px]"></i>
+                                        已給 {{ getScoreForClassRole(cls.name, currentRole) }} 分
+                                    </span>
+                                    <span v-else class="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                                        <i class="fa-regular fa-clock mr-1 text-[10px]"></i> 待評分
+                                    </span>
+                                </div>
+                            </div>
+
+                            <!-- Score Selection Buttons (0 to 10) -->
+                            <div class="mb-4">
+                                <div class="flex justify-between items-center mb-1.5">
+                                    <label class="text-xs font-bold text-slate-700">專注度評分 (0 - 10 分)：</label>
+                                    <span class="text-[11px] text-emerald-600 font-semibold"><i class="fa-solid fa-bolt text-[10px] mr-0.5"></i>點擊即時自動儲存</span>
+                                </div>
+                                <div class="grid grid-cols-11 gap-1 bg-slate-50 p-1.5 rounded-xl border border-slate-200">
+                                    <button v-for="scoreNum in [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]" :key="scoreNum"
+                                        @click="setScore(cls.name, scoreNum)"
+                                        :class="['h-9 rounded-lg text-xs font-black transition-all flex items-center justify-center',
+                                            getScoreForClassRole(cls.name, currentRole) === scoreNum
+                                                ? 'bg-indigo-600 text-white shadow-md scale-105 ring-2 ring-indigo-400'
+                                                : 'bg-white text-slate-700 hover:bg-slate-200 border border-slate-200/80']">
+                                        {{ scoreNum }}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Preset Tags -->
+                            <div class="mb-4">
+                                <label class="text-xs font-bold text-slate-700 mb-1.5 block">快捷評語標籤：</label>
+                                <div class="flex flex-wrap gap-1.5">
+                                    <button v-for="tag in presetTags" :key="tag"
+                                        @click="toggleTag(cls.name, tag)"
+                                        :class="['px-2.5 py-1 rounded-lg text-xs font-medium transition-all',
+                                            getTagForClassRole(cls.name, currentRole) === tag
+                                                ? 'bg-amber-500 text-white font-bold shadow-sm'
+                                                : 'bg-slate-100 text-slate-600 hover:bg-slate-200 border border-slate-200/60']">
+                                        {{ tag }}
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Custom Note Input -->
+                            <div class="mb-2">
+                                <label class="text-xs font-bold text-slate-700 mb-1 block">備註說明：</label>
+                                <input type="text"
+                                    :value="getNoteForClassRole(cls.name, currentRole)"
+                                    @input="updateNote(cls.name, $event.target.value)"
+                                    placeholder="填寫具體觀察 (如：3人閱讀電子書...)"
+                                    class="w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-1.5 text-xs text-slate-800 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                            </div>
+                        </div>
+
+                        <!-- Card Footer Action -->
+                        <div v-if="getScoreForClassRole(cls.name, currentRole) !== null" class="pt-2 border-t border-slate-100 flex justify-end">
+                            <button @click="clearRating(cls.name)" class="text-[11px] text-slate-400 hover:text-red-500 font-medium flex items-center gap-1 transition-colors">
+                                <i class="fa-solid fa-trash-can text-[10px]"></i> 重設本班評分
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Empty State -->
+                <div v-else class="bg-white rounded-2xl p-12 text-center border border-slate-200">
+                    <i class="fa-solid fa-filter-circle-xmark text-4xl text-slate-300 mb-3"></i>
+                    <p class="text-slate-500 text-sm font-medium">未找到符合條件的班別</p>
+                </div>
+            </div>
+
+            <!-- TAB 2: CUMULATIVE COMPETITION RESULTS -->
+            <div v-if="activeTab === 'cumulative'" class="space-y-6">
+                <!-- Page Title Header -->
+                <div class="bg-gradient-to-r from-amber-500 to-amber-600 rounded-2xl p-6 text-white shadow-md flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                    <div>
+                        <h2 class="text-xl font-black tracking-tight flex items-center gap-2">
+                            <i class="fa-solid fa-award text-2xl text-amber-200"></i>
+                            閱讀專注度比賽 — 跨日累計總分榜
+                        </h2>
+                        <p class="text-xs text-amber-100 mt-1">系統自動整合所有星期三巡視日分數，計算各年級最高分優勝班別</p>
+                    </div>
+
+                    <button @click="exportCumulativeCSV"
+                        class="bg-indigo-900 hover:bg-indigo-950 text-amber-300 font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-lg transition-colors border border-amber-400/30">
+                        <i class="fa-solid fa-file-excel"></i>
+                        匯出比賽累計總分報表
+                    </button>
+                </div>
+
+                <!-- Winners Banner per Grade (Gold Cards) -->
+                <div>
+                    <h3 class="text-base font-bold text-slate-800 mb-3 flex items-center">
+                        <i class="fa-solid fa-crown text-amber-500 mr-2"></i>
+                        各年級優勝（冠軍）班別
+                    </h3>
+                    <div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+                        <div v-for="g in grades" :key="g"
+                            class="bg-white rounded-2xl p-4 border-2 border-amber-300/80 shadow-sm flex flex-col items-center text-center relative overflow-hidden">
+                            <div class="absolute -right-3 -top-3 bg-amber-100 text-amber-600 w-10 h-10 rounded-full flex items-end justify-start p-1.5 opacity-50">
+                                <i class="fa-solid fa-trophy text-sm"></i>
+                            </div>
+                            <span class="text-xs font-bold text-slate-500 mb-1">{{ g }} 冠軍</span>
+                            <span class="text-2xl font-black text-amber-600 my-0.5">
+                                {{ getGradeWinner(g).name }}
+                            </span>
+                            <div class="text-[11px] font-semibold text-slate-600 bg-amber-50 px-2 py-0.5 rounded-md mt-1 border border-amber-200">
+                                總分: <span class="font-extrabold text-indigo-700">{{ getGradeWinner(g).totalScore }}</span>
+                            </div>
+                            <span class="text-[10px] text-slate-400 mt-1">
+                                (已巡視 {{ getGradeWinner(g).daysCount }} 次)
+                            </span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Detailed Cumulative Score Table -->
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 mb-5">
+                        <div>
+                            <h3 class="text-base font-bold text-slate-800">全校 21 班跨日累計得分與各日明細表</h3>
+                            <p class="text-xs text-slate-500 mt-0.5">系統自動將所有已輸入評分的巡視日期獨立列出，方便核對各日表現</p>
+                        </div>
+                        
+                        <!-- Search & Filter -->
+                        <div class="flex items-center space-x-2">
+                            <select v-model="selectedGrade" class="bg-slate-50 border border-slate-300 text-xs font-medium rounded-lg px-2.5 py-1.5 focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                                <option value="ALL">全部年級</option>
+                                <option v-for="grade in grades" :key="grade" :value="grade">{{ grade }}</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                    <th class="p-3 whitespace-nowrap">年級</th>
+                                    <th class="p-3 whitespace-nowrap">班別</th>
+                                    <!-- Dynamic Date Header Columns -->
+                                    <th v-for="d in allRecordedDates" :key="d" class="p-3 text-center whitespace-nowrap bg-indigo-50/70 text-indigo-900 border-x border-slate-200/60 font-black">
+                                        <i class="fa-regular fa-calendar-days text-indigo-500 mr-1"></i>{{ d }}
+                                    </th>
+                                    <th class="p-3 text-center whitespace-nowrap">已巡視天數</th>
+                                    <th class="p-3 text-center whitespace-nowrap">跨日累計總分</th>
+                                    <th class="p-3 text-center whitespace-nowrap">日均得分</th>
+                                    <th class="p-3 text-center whitespace-nowrap">級內排名</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr v-for="item in filteredCumulativeList" :key="item.name" 
+                                    :class="item.gradeRank === 1 ? 'bg-amber-50/60 font-medium' : 'hover:bg-slate-50'">
+                                    <td class="p-3 font-semibold text-slate-600 whitespace-nowrap">{{ item.grade }}</td>
+                                    <td class="p-3 font-extrabold text-slate-800 text-sm whitespace-nowrap">
+                                        <span class="inline-flex items-center gap-1.5">
+                                            {{ item.name }}
+                                            <i v-if="item.gradeRank === 1" class="fa-solid fa-crown text-amber-500 text-xs" title="級內第一名"></i>
+                                        </span>
+                                    </td>
+                                    <!-- Dynamic Date Score Cells -->
+                                    <td v-for="d in allRecordedDates" :key="d" 
+                                        :class="['p-3 text-center font-bold border-x border-slate-100 whitespace-nowrap', 
+                                            item.dateScores[d] !== '-' ? 'text-indigo-700 bg-indigo-50/20' : 'text-slate-300']">
+                                        {{ item.dateScores[d] }}
+                                    </td>
+                                    <td class="p-3 text-center font-bold text-slate-600 whitespace-nowrap">{{ item.daysCount }} 天</td>
+                                    <td class="p-3 text-center whitespace-nowrap">
+                                        <span class="px-2.5 py-1 rounded-lg bg-indigo-50 text-indigo-700 font-black text-sm border border-indigo-100">
+                                            {{ item.totalScore }}
+                                        </span>
+                                    </td>
+                                    <td class="p-3 text-center font-bold text-slate-600 whitespace-nowrap">{{ item.avgPerDay }}</td>
+                                    <td class="p-3 text-center whitespace-nowrap">
+                                        <span :class="['px-2 py-0.5 rounded-full text-[11px] font-bold',
+                                            item.gradeRank === 1 ? 'bg-amber-400 text-white' : 'bg-slate-100 text-slate-600']">
+                                            第 {{ item.gradeRank }} 名
+                                        </span>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 3: OVERVIEW TABLE & EXPORT -->
+            <div v-if="activeTab === 'overview'" class="space-y-6">
+                <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200/80">
+                    <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+                        <div>
+                            <h2 class="text-lg font-bold text-slate-800">21 班評分明細總覽</h2>
+                            <p class="text-xs text-slate-500">即時檢視校長、副校長、家長及老師之評分</p>
+                        </div>
+
+                        <button @click="exportToCSV"
+                            class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2.5 rounded-xl text-xs flex items-center gap-2 shadow-md shadow-emerald-100 transition-colors">
+                            <i class="fa-solid fa-file-excel text-sm"></i>
+                            匯出 Excel CSV 報表
+                        </button>
+                    </div>
+
+                    <!-- Table Container -->
+                    <div class="overflow-x-auto rounded-xl border border-slate-200">
+                        <table class="w-full text-left border-collapse text-xs">
+                            <thead>
+                                <tr class="bg-slate-100 text-slate-700 font-bold border-b border-slate-200">
+                                    <th class="p-3">班別</th>
+                                    <th class="p-3">年級</th>
+                                    <th class="p-3 text-center">校長評分</th>
+                                    <th class="p-3 text-center">副校長評分</th>
+                                    <th class="p-3 text-center">家長評分</th>
+                                    <th class="p-3 text-center">老師評分</th>
+                                    <th class="p-3 text-center">平均分</th>
+                                    <th class="p-3">評語標籤 / 備註</th>
+                                </tr>
+                            </thead>
+                            <tbody class="divide-y divide-slate-100">
+                                <tr v-for="cls in allClassList" :key="cls.name" class="hover:bg-slate-50">
+                                    <td class="p-3 font-extrabold text-slate-800">{{ cls.name }}</td>
+                                    <td class="p-3 font-medium text-slate-500">{{ cls.grade }}</td>
+                                    <td class="p-3 text-center font-bold" :class="getScoreForClassRole(cls.name, '校長') !== null ? 'text-indigo-600' : 'text-slate-300'">
+                                        {{ getScoreForClassRole(cls.name, '校長') !== null ? getScoreForClassRole(cls.name, '校長') : '-' }}
+                                    </td>
+                                    <td class="p-3 text-center font-bold" :class="getScoreForClassRole(cls.name, '副校長') !== null ? 'text-indigo-600' : 'text-slate-300'">
+                                        {{ getScoreForClassRole(cls.name, '副校長') !== null ? getScoreForClassRole(cls.name, '副校長') : '-' }}
+                                    </td>
+                                    <td class="p-3 text-center font-bold" :class="getScoreForClassRole(cls.name, '家長') !== null ? 'text-indigo-600' : 'text-slate-300'">
+                                        {{ getScoreForClassRole(cls.name, '家長') !== null ? getScoreForClassRole(cls.name, '家長') : '-' }}
+                                    </td>
+                                    <td class="p-3 text-center font-bold" :class="getScoreForClassRole(cls.name, '老師') !== null ? 'text-indigo-600' : 'text-slate-300'">
+                                        {{ getScoreForClassRole(cls.name, '老師') !== null ? getScoreForClassRole(cls.name, '老師') : '-' }}
+                                    </td>
+                                    <td class="p-3 text-center">
+                                        <span class="px-2 py-1 rounded-md bg-indigo-50 font-black text-indigo-700">
+                                            {{ getClassAverageScore(cls.name) }}
+                                        </span>
+                                    </td>
+                                    <td class="p-3 text-slate-600 max-w-xs truncate">
+                                        <div class="flex flex-col space-y-1">
+                                            <span v-for="r in roles" :key="r">
+                                                <span v-if="getNoteForClassRole(cls.name, r) || getTagForClassRole(cls.name, r)" class="text-[11px]">
+                                                    <strong class="text-slate-700">{{ r }}:</strong> 
+                                                    <span v-if="getTagForClassRole(cls.name, r)" class="text-amber-600 font-semibold mr-1">[{{ getTagForClassRole(cls.name, r) }}]</span>
+                                                    <span>{{ getNoteForClassRole(cls.name, r) }}</span>
+                                                </span>
+                                            </span>
+                                        </div>
+                                    </td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+
+        </main>
+
+        <!-- Footer -->
+        <footer class="bg-slate-900 text-slate-400 text-xs py-6 mt-auto">
+            <div class="max-w-7xl mx-auto px-4 text-center space-y-2">
+                <p>© 2026-2027 晨讀專注評分系統 | 校園閱讀專注度巡視模組</p>
+                <p class="text-slate-500">支援校長、副校長、家長及老師即時線上打分與導出</p>
+            </div>
+        </footer>
+    </div>
+
+    <script>
+        const { createApp, ref, computed, watch, onMounted } = Vue;
+
+        createApp({
+            setup() {
+                // Roles list
+                const roles = ['校長', '副校長', '家長', '老師'];
+                const currentRole = ref('校長');
+
+                // Active Tab
+                const activeTab = ref('rating');
+
+                // Cloud Sync States
+                const showCloudModal = ref(false);
+                const cloudUrl = ref(localStorage.getItem('reading_cloud_url') || '');
+                const cloudUrlInput = ref(cloudUrl.value);
+                const isSyncing = ref(false);
+
+                function saveCloudConfig() {
+                    cloudUrl.value = cloudUrlInput.value.trim();
+                    localStorage.setItem('reading_cloud_url', cloudUrl.value);
+                    showCloudModal.value = false;
+                    if (cloudUrl.value) {
+                        pullFromCloud();
+                    }
+                }
+
+                async function pullFromCloud() {
+                    if (!cloudUrl.value) return;
+                    isSyncing.value = true;
+                    try {
+                        const res = await fetch(cloudUrl.value, {
+                            method: 'GET',
+                            headers: { 'Accept': 'application/json, text/plain, */*' }
+                        });
+                        
+                        if (!res.ok) {
+                            throw new Error(`HTTP 錯誤狀態碼: ${res.status}`);
+                        }
+
+                        const rawText = await res.text();
+
+                        // 判斷是否回傳了 HTML 頁面（代表權限未設定為「所有人」或網址錯誤）
+                        if (rawText.trim().startsWith('<') || rawText.includes('<!DOCTYPE html>')) {
+                            throw new Error('Google 回傳了登入網頁，請檢查 Google Apps Script 部署權限是否設為「所有人 (Anyone)」');
+                        }
+
+                        let data = {};
+                        if (rawText.trim()) {
+                            try {
+                                data = JSON.parse(rawText);
+                            } catch (parseErr) {
+                                throw new Error('雲端資料格式不正確，無法解析 JSON');
+                            }
+                        }
+
+                        if (data && typeof data === 'object') {
+                            // 若雲端試算表完全是空的，且本地已有資料，則自動備份至雲端
+                            if (Object.keys(data).length === 0 && Object.keys(ratingsData.value).length > 0) {
+                                await pushToCloud();
+                                showToast('已成功初始化雲端資料庫！');
+                            } else {
+                                ratingsData.value = data;
+                                saveStorage(false);
+                                showToast('已成功從雲端同步最新分數數據！');
+                            }
+                        }
+                    } catch (e) {
+                        console.warn('Cloud pull issue:', e);
+                        let errorDetail = e.message || '連線失敗';
+                        if (e.name === 'TypeError' && (e.message.includes('fetch') || e.message.includes('Failed'))) {
+                            errorDetail = '無法連線至 Google 雲端 API (Failed to fetch)。\n\n可能原因：\n1. 雲端 API 網址填寫錯誤或未包含 /exec\n2. Google Apps Script 部署權限未設為「所有人 (Anyone)」\n3. 正在沙盒/預覽環境中運作（部署至正式網站或 GitHub Pages 後即可正常連線）。';
+                        }
+                        alert('雲端同步提示：\n' + errorDetail);
+                    } finally {
+                        isSyncing.value = false;
+                    }
+                }
+
+                async function pushToCloud() {
+                    if (!cloudUrl.value) return;
+                    try {
+                        await fetch(cloudUrl.value, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: { 'Content-Type': 'text/plain' },
+                            body: JSON.stringify(ratingsData.value)
+                        });
+                    } catch (e) {
+                        console.warn('Cloud push failed:', e);
+                    }
+                }
+
+                async function pushToCloud() {
+                    if (!cloudUrl.value) return;
+                    try {
+                        await fetch(cloudUrl.value, {
+                            method: 'POST',
+                            mode: 'no-cors',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify(ratingsData.value)
+                        });
+                    } catch (e) {
+                        console.error('Cloud push failed:', e);
+                    }
+                }
+
+                // 監聽身份變更：非「老師」身份時自動限制在「即時打分卡」頁面
+                watch(currentRole, (newRole) => {
+                    if (newRole !== '老師' && activeTab.value !== 'rating') {
+                        activeTab.value = 'rating';
+                    }
+                });
+
+                // Date Selection (default to current date YYYY-MM-DD)
+                const today = new Date().toISOString().split('T')[0];
+                const selectedDate = ref(today);
+
+                // Grades definition (Secondary only: 中一至中六)
+                const grades = ['中一', '中二', '中三', '中四', '中五', '中六'];
+
+                // Preset Tags
+                const presetTags = ['全班安靜專注', '閱讀氣氛良好', '大部分同學專注', '個別同學需提醒', '偶有吵鬧'];
+
+                // Generate 21 Secondary Classes (1A-3D, 4A-6C)
+                const allClassList = computed(() => {
+                    const list = [];
+                    for (let g = 1; g <= 3; g++) {
+                        ['A', 'B', 'C', 'D'].forEach(letter => {
+                            list.push({ name: `${g}${letter}`, grade: `中${getChineseNum(g)}` });
+                        });
+                    }
+                    for (let g = 4; g <= 6; g++) {
+                        ['A', 'B', 'C'].forEach(letter => {
+                            list.push({ name: `${g}${letter}`, grade: `中${getChineseNum(g)}` });
+                        });
+                    }
+                    return list;
+                });
+
+                function getChineseNum(n) {
+                    const map = { 1: '一', 2: '二', 3: '三', 4: '四', 5: '五', 6: '六' };
+                    return map[n] || n;
+                }
+
+                // Filtering State
+                const selectedGrade = ref('ALL');
+                const statusFilter = ref('ALL');
+                const searchQuery = ref('');
+
+                // Main Reactive Rating Store
+                const ratingsData = ref({});
+                const isStorageRestricted = ref(false);
+
+                // Toast Notification System
+                const toastMessage = ref('');
+                function showToast(msg) {
+                    toastMessage.value = msg;
+                    setTimeout(() => {
+                        toastMessage.value = '';
+                    }, 2200);
+                }
+
+                // Load from LocalStorage
+                function loadStorage() {
+                    try {
+                        const saved = localStorage.getItem('morning_reading_ratings_2026');
+                        if (saved) {
+                            ratingsData.value = JSON.parse(saved);
+                        }
+                    } catch (e) {
+                        console.warn('LocalStorage access restricted:', e);
+                        isStorageRestricted.value = true;
+                    }
+                }
+
+                // Save to LocalStorage & Push to Cloud
+                function saveStorage(shouldPushToCloud = true) {
+                    try {
+                        localStorage.setItem('morning_reading_ratings_2026', JSON.stringify(ratingsData.value));
+                    } catch (e) {
+                        console.warn('LocalStorage save failed:', e);
+                        isStorageRestricted.value = true;
+                    }
+                    if (shouldPushToCloud) {
+                        pushToCloud();
+                    }
+                }
+
+                // Backup and Restore Methods
+                function exportBackupJSON() {
+                    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(ratingsData.value, null, 2));
+                    const downloadAnchor = document.createElement('a');
+                    downloadAnchor.setAttribute("href", dataStr);
+                    downloadAnchor.setAttribute("download", `晨讀評分系統全量數據備份_${selectedDate.value}.json`);
+                    document.body.appendChild(downloadAnchor);
+                    downloadAnchor.click();
+                    downloadAnchor.remove();
+                    showToast('已成功匯出 JSON 數據備份檔！');
+                }
+
+                function importBackupJSON(event) {
+                    const file = event.target.files[0];
+                    if (!file) return;
+                    const reader = new FileReader();
+                    reader.onload = (e) => {
+                        try {
+                            const imported = JSON.parse(e.target.result);
+                            if (typeof imported === 'object' && imported !== null) {
+                                ratingsData.value = imported;
+                                saveStorage();
+                                showToast('已成功匯入備份數據！');
+                            } else {
+                                alert('檔案格式不正確！');
+                            }
+                        } catch (err) {
+                            alert('無法解析該 JSON 檔案！');
+                        }
+                    };
+                    reader.readAsText(file);
+                    event.target.value = '';
+                }
+
+                // Ensure data structure exists for date & class
+                function ensureDataStructure(className, roleName) {
+                    const dateKey = selectedDate.value;
+                    if (!ratingsData.value[dateKey]) {
+                        ratingsData.value[dateKey] = {};
+                    }
+                    if (!ratingsData.value[dateKey][className]) {
+                        ratingsData.value[dateKey][className] = {};
+                    }
+                    if (!ratingsData.value[dateKey][className][roleName]) {
+                        ratingsData.value[dateKey][className][roleName] = { score: null, tag: '', note: '' };
+                    }
+                }
+
+                // Helper getters
+                function getScoreForClassRole(className, roleName) {
+                    const dateKey = selectedDate.value;
+                    return ratingsData.value[dateKey]?.[className]?.[roleName]?.score ?? null;
+                }
+
+                function getTagForClassRole(className, roleName) {
+                    const dateKey = selectedDate.value;
+                    return ratingsData.value[dateKey]?.[className]?.[roleName]?.tag ?? '';
+                }
+
+                function getNoteForClassRole(className, roleName) {
+                    const dateKey = selectedDate.value;
+                    return ratingsData.value[dateKey]?.[className]?.[roleName]?.note ?? '';
+                }
+
+                // AUTO-SAVE rating operations
+                function setScore(className, score) {
+                    const role = currentRole.value;
+                    ensureDataStructure(className, role);
+                    ratingsData.value[selectedDate.value][className][role].score = score;
+                    saveStorage();
+                    showToast(`已儲存 ${className} [${role}] 評分: ${score}分`);
+                }
+
+                function toggleTag(className, tag) {
+                    const role = currentRole.value;
+                    ensureDataStructure(className, role);
+                    const currentTag = ratingsData.value[selectedDate.value][className][role].tag;
+                    ratingsData.value[selectedDate.value][className][role].tag = currentTag === tag ? '' : tag;
+                    saveStorage();
+                    showToast(`已更新 ${className} [${role}] 評語標籤`);
+                }
+
+                function updateNote(className, noteText) {
+                    const role = currentRole.value;
+                    ensureDataStructure(className, role);
+                    ratingsData.value[selectedDate.value][className][role].note = noteText;
+                    saveStorage();
+                }
+
+                function clearRating(className) {
+                    const role = currentRole.value;
+                    const dateKey = selectedDate.value;
+                    if (ratingsData.value[dateKey]?.[className]?.[role]) {
+                        ratingsData.value[dateKey][className][role] = { score: null, tag: '', note: '' };
+                        saveStorage();
+                        showToast(`已重設 ${className} [${role}] 的評分`);
+                    }
+                }
+
+                function handleDateChange() {
+                    showToast(`已切換巡視日期至：${selectedDate.value}`);
+                }
+
+                function handleRoleChange() {
+                    showToast(`切換評判身份為：${currentRole.value}`);
+                }
+
+                function getRoleIcon(role) {
+                    switch (role) {
+                        case '校長': return 'fa-solid fa-user-tie';
+                        case '副校長': return 'fa-solid fa-user-gear';
+                        case '家長': return 'fa-solid fa-people-roof';
+                        case '老師': return 'fa-solid fa-chalkboard-user';
+                        default: return 'fa-solid fa-user';
+                    }
+                }
+
+                // Filtered classes list
+                const filteredClasses = computed(() => {
+                    return allClassList.value.filter(cls => {
+                        if (selectedGrade.value !== 'ALL' && cls.grade !== selectedGrade.value) return false;
+                        if (searchQuery.value && !cls.name.toLowerCase().includes(searchQuery.value.toLowerCase())) return false;
+                        const score = getScoreForClassRole(cls.name, currentRole.value);
+                        if (statusFilter.value === 'PENDING' && score !== null) return false;
+                        if (statusFilter.value === 'COMPLETED' && score === null) return false;
+                        return true;
+                    });
+                });
+
+                // Stats Computation
+                const totalClassesCount = computed(() => allClassList.value.length);
+                const ratedCountByCurrentRole = computed(() => {
+                    return allClassList.value.filter(cls => getScoreForClassRole(cls.name, currentRole.value) !== null).length;
+                });
+
+                function getClassAverageScore(className) {
+                    const scores = roles.map(r => getScoreForClassRole(className, r)).filter(s => s !== null);
+                    if (scores.length === 0) return '-';
+                    const sum = scores.reduce((a, b) => a + b, 0);
+                    return (sum / scores.length).toFixed(1);
+                }
+
+                const allRecordedDates = computed(() => {
+                    return Object.keys(ratingsData.value).filter(d => {
+                        const dateObj = ratingsData.value[d];
+                        if (!dateObj) return false;
+                        return Object.keys(dateObj).some(cls => {
+                            return roles.some(r => dateObj[cls]?.[r]?.score !== null && dateObj[cls]?.[r]?.score !== undefined);
+                        });
+                    }).sort();
+                });
+
+                const cumulativeDataList = computed(() => {
+                    const classStats = {};
+                    allClassList.value.forEach(cls => {
+                        classStats[cls.name] = {
+                            name: cls.name,
+                            grade: cls.grade,
+                            dateScores: {},
+                            totalScore: 0,
+                            daysCount: 0,
+                            avgPerDay: 0,
+                            gradeRank: 0
+                        };
+                    });
+
+                    allRecordedDates.value.forEach(dateKey => {
+                        const dateRatings = ratingsData.value[dateKey];
+                        allClassList.value.forEach(cls => {
+                            const clsRoleRatings = dateRatings?.[cls.name];
+                            if (!clsRoleRatings) {
+                                classStats[cls.name].dateScores[dateKey] = '-';
+                                return;
+                            }
+                            const scores = roles.map(r => clsRoleRatings[r]?.score).filter(s => s !== null && s !== undefined);
+                            if (scores.length > 0) {
+                                const dailyAvg = parseFloat((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1));
+                                classStats[cls.name].dateScores[dateKey] = dailyAvg;
+                                classStats[cls.name].totalScore += dailyAvg;
+                                classStats[cls.name].daysCount += 1;
+                            } else {
+                                classStats[cls.name].dateScores[dateKey] = '-';
+                            }
+                        });
+                    });
+
+                    const result = Object.values(classStats).map(item => {
+                        const total = item.totalScore;
+                        const days = item.daysCount;
+                        return {
+                            ...item,
+                            totalScore: parseFloat(total.toFixed(1)),
+                            avgPerDay: days > 0 ? (total / days).toFixed(1) : '0.0'
+                        };
+                    });
+
+                    grades.forEach(g => {
+                        const inGrade = result.filter(r => r.grade === g).sort((a, b) => b.totalScore - a.totalScore);
+                        inGrade.forEach((item, index) => {
+                            item.gradeRank = index + 1;
+                        });
+                    });
+
+                    return result;
+                });
+
+                const filteredCumulativeList = computed(() => {
+                    return cumulativeDataList.value.filter(item => {
+                        if (selectedGrade.value !== 'ALL' && item.grade !== selectedGrade.value) return false;
+                        return true;
+                    }).sort((a, b) => {
+                        if (a.grade !== b.grade) return a.grade.localeCompare(b.grade);
+                        return a.gradeRank - b.gradeRank;
+                    });
+                });
+
+                function getGradeWinner(gradeName) {
+                    const gradeClasses = cumulativeDataList.value.filter(c => c.grade === gradeName);
+                    const sorted = gradeClasses.sort((a, b) => b.totalScore - a.totalScore);
+                    if (sorted.length > 0 && sorted[0].totalScore > 0) {
+                        return sorted[0];
+                    }
+                    return { name: '暫無', totalScore: 0, daysCount: 0 };
+                }
+
+                function exportCumulativeCSV() {
+                    const dateHeaders = allRecordedDates.value.length > 0 ? allRecordedDates.value : ['無歷史日期'];
+                    const headers = ['年級', '班別', ...dateHeaders, '已巡視日數', '跨日累計總分', '日均得分', '級內排名'];
+                    const rows = [headers];
+
+                    cumulativeDataList.value.forEach(item => {
+                        const dateScoresRow = dateHeaders.map(d => item.dateScores[d] !== undefined ? item.dateScores[d] : '-');
+                        rows.push([
+                            item.grade,
+                            item.name,
+                            ...dateScoresRow,
+                            item.daysCount,
+                            item.totalScore,
+                            item.avgPerDay,
+                            item.gradeRank
+                        ]);
+                    });
+
+                    const csvContent = '\uFEFF' + rows.map(e => e.join(',')).join('\n');
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `晨讀比賽跨日累計總分與每日明細表.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    showToast('已成功匯出跨日累計總分與每日明細報表！');
+                }
+
+                function exportToCSV() {
+                    const headers = ['日期', '班別', '年級', '校長評分', '副校長評分', '家長評分', '老師評分', '平均專注度', '評語與備註'];
+                    const rows = [headers];
+
+                    allClassList.value.forEach(cls => {
+                        const principalScore = getScoreForClassRole(cls.name, '校長') ?? '';
+                        const vicePrincipalScore = getScoreForClassRole(cls.name, '副校長') ?? '';
+                        const parentScore = getScoreForClassRole(cls.name, '家長') ?? '';
+                        const teacherScore = getScoreForClassRole(cls.name, '老師') ?? '';
+                        const avgScore = getClassAverageScore(cls.name);
+
+                        const notesArr = roles.map(r => {
+                            const tag = getTagForClassRole(cls.name, r);
+                            const note = getNoteForClassRole(cls.name, r);
+                            if (tag || note) return `${r}:[${tag}]${note}`;
+                            return '';
+                        }).filter(Boolean);
+
+                        rows.push([
+                            selectedDate.value,
+                            cls.name,
+                            cls.grade,
+                            principalScore,
+                            vicePrincipalScore,
+                            parentScore,
+                            teacherScore,
+                            avgScore,
+                            `"${notesArr.join('; ')}"`
+                        ]);
+                    });
+
+                    const csvContent = '\uFEFF' + rows.map(e => e.join(',')).join('\n');
+                    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                    const url = URL.createObjectURL(blob);
+                    const link = document.createElement('a');
+                    link.setAttribute('href', url);
+                    link.setAttribute('download', `晨讀專注評分報表_${selectedDate.value}.csv`);
+                    document.body.appendChild(link);
+                    link.click();
+                    document.body.removeChild(link);
+                    showToast('已成功匯出 CSV 報表！');
+                }
+
+                onMounted(() => {
+                    loadStorage();
+                    if (cloudUrl.value) {
+                        pullFromCloud();
+                    }
+                });
+
+                return {
+                    roles,
+                    currentRole,
+                    activeTab,
+                    selectedDate,
+                    grades,
+                    presetTags,
+                    allClassList,
+                    selectedGrade,
+                    statusFilter,
+                    searchQuery,
+                    filteredClasses,
+                    toastMessage,
+                    isStorageRestricted,
+                    totalClassesCount,
+                    ratedCountByCurrentRole,
+                    cumulativeDataList,
+                    filteredCumulativeList,
+                    showCloudModal,
+                    cloudUrl,
+                    cloudUrlInput,
+                    isSyncing,
+                    saveCloudConfig,
+                    pullFromCloud,
+                    getGradeWinner,
+                    exportCumulativeCSV,
+                    getScoreForClassRole,
+                    getTagForClassRole,
+                    getNoteForClassRole,
+                    setScore,
+                    toggleTag,
+                    updateNote,
+                    clearRating,
+                    getClassAverageScore,
+                    handleDateChange,
+                    handleRoleChange,
+                    getRoleIcon,
+                    exportToCSV,
+                    exportBackupJSON,
+                    importBackupJSON
+                };
+            }
+        }).mount('#app');
+    </script>
+</body>
+</html>
